@@ -1,0 +1,4 @@
+-- Create local indexes for user_id and event_time from table system_logs
+
+create index idx_system_logs_user_id on system_logs(user_id) local;
+create index idx_system_logs_event_time on system_logs(event_time) local;
