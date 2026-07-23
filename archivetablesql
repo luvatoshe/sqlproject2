@@ -1,0 +1,21 @@
+-- Create archive table (system_logs_archive) and partition by archive_date 
+
+create table system_logs_archive (log_id       number primary key,
+                                  event_time   timestamp,
+                                  module_name  varchar2(64),
+                                  user_id      number,
+                                  event_type   varchar2(20),
+                                  message      clob,
+                                  ip_adress    varchar2(64),
+                                  archive_date timestamp default systimestamp
+)
+partition by range (archive_date)
+interval (numtoyminterval(1, 'YEAR'))
+(
+partition p_initial values less than (timestamp '2026-07-01 00:00:00')
+);
+
+-- Create local indexes for user_id and event_time from table system_logs_archive
+
+create index idx_system_logs_archive_user_id on system_logs_archive(user_id) local;
+create index idx_system_logs_archive_event_time on system_logs_archive(event_time) local;
