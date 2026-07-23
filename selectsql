@@ -16,7 +16,7 @@ create table system_logs (log_id number primary key,
                           ip_adress   varchar2(64)
 )
 
--- Create partition by event_type and 
+-- Create partition by event_type 
 
 partition by range (event_time)
 interval (numtoyminterval(1, 'MONTH'))
