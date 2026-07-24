@@ -1,0 +1,175 @@
+-- Auto select data source (system_logs or system_logs_archive)
+
+create or replace function auto_cursor (
+    p_start_date timestamp,
+    p_end_date   timestamp,
+    p_user_id    number default null,
+    p_event_type varchar2 default null
+)   return sys_refcursor
+is
+    v_cursor        sys_refcursor;
+    v_sql           varchar2(4000);
+    v_has_archive   number;
+    v_has_main      number;
+begin
+    -- Define location of the data (system_logs or/and system_logs_archive)
+    
+    select count(*)
+    into v_has_archive
+    from system_logs_archive
+    where event_time between p_start_date and p_end_date
+        and rownum = 1;
+    
+    select count(*)
+    into v_has_main
+    from system_logs
+    where event_time between p_start_date and p_end_date
+        and rownum = 1;
+        
+    -- =========================================================================
+    -- First option: all data in system_logs
+    -- =========================================================================
+    
+    if v_has_main > 0 and v_has_archive = 0 then
+        v_sql := 'select log_id, 
+                         event_time, 
+                         module_name, 
+                         user_id, 
+                         event_type, 
+                         message, 
+                         ip_address,
+                         ''MAIN'' as source_table
+                  from system_logs
+                  where event_time between :1 and :2';
+        if p_user_id is not null then
+            v_sql := v_sql || ' and user_id = :3';
+        end if;
+        if p_event_type is not null then
+            v_sql := v_sql || ' and event_type = :4';
+        end if;
+        
+        v_sql := v_sql || ' order by event_time';
+    
+        -- Open cursor for first option
+    
+        if p_user_id is not null and p_event_type is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_user_id, p_event_type;
+        elsif p_user_id is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_user_id;
+        elsif p_event_type is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_event_type;
+        else
+            open v_cursor for v_sql using p_start_date, p_end_date;
+        end if;
+        
+    -- =========================================================================
+    -- Second option: all data in system_logs_archive
+    -- =========================================================================
+    
+    elsif v_has_main = 0 and v_has_archive > 0 then
+        v_sql := 'select log_id, 
+                         event_time, 
+                         module_name, 
+                         user_id, 
+                         event_type, 
+                         message, 
+                         ip_address,
+                         ''ARCHIVE'' as source_table
+                  from system_logs_archive
+                  where event_time between :1 and :2';
+        if p_user_id is not null then
+            v_sql := v_sql || ' and user_id = :3';
+        end if;
+        if p_event_type is not null then
+            v_sql := v_sql || ' and event_type = :4';
+        end if;
+    
+        v_sql := v_sql || ' order by event_time';
+        
+        -- Open cursor for first option
+    
+        if p_user_id is not null and p_event_type is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_user_id, p_event_type;
+        elsif p_user_id is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_user_id;
+        elsif p_event_type is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_event_type;
+        else
+            open v_cursor for v_sql using p_start_date, p_end_date;
+        end if;
+    
+    -- =========================================================================
+    -- Third option: data in system_logs and system_logs_archive
+    -- =========================================================================
+    
+    elsif v_has_main > 0 and v_has_archive > 0 then
+        v_sql := 'select log_id, 
+                         event_time, 
+                         module_name, 
+                         user_id, 
+                         event_type, 
+                         message, 
+                         ip_address,
+                         ''MAIN'' as source_table
+                  from system_logs
+                  where event_time between :1 and :2';
+        if p_user_id is not null then
+            v_sql := v_sql || ' and user_id = :3';
+        end if;
+        if p_event_type is not null then
+            v_sql := v_sql || ' and event_type = :4';
+        end if;
+    
+        v_sql := v_sql || ' union all';
+        
+        v_sql := v_sql || 'select log_id, 
+                                  event_time, 
+                                  module_name, 
+                                  user_id, 
+                                  event_type, 
+                                  message, 
+                                  ip_address,
+                                  ''ARCHIVE'' as source_table
+                           from system_logs_archive
+                           where event_time between :1 and :2';
+        if p_user_id is not null then
+            v_sql := v_sql || ' and user_id = :3';
+        end if;
+        if p_event_type is not null then
+            v_sql := v_sql || ' and event_type = :4';
+        end if;
+        
+        
+        v_sql := v_sql || ' order by event_time';
+    
+        -- Open cursor for first option
+    
+        if p_user_id is not null and p_event_type is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_user_id, p_event_type;
+        elsif p_user_id is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_user_id;
+        elsif p_event_type is not null then
+            open v_cursor for v_sql using p_start_date, p_end_date, p_event_type;
+        else
+            open v_cursor for v_sql using p_start_date, p_end_date;
+        end if;
+    
+    -- =========================================================================
+    -- Fourth option: data not found
+    -- =========================================================================
+    
+    else 
+        open v_cursor for select  null as log_id , 
+                                  null as event_time, 
+                                  null as module_name, 
+                                  null as user_id, 
+                                  null as event_type, 
+                                  null as message, 
+                                  null as ip_address,
+                                  'NO_DATA' as source_table
+                          from dual
+                          where 1 = 0;
+    end if;
+    return v_cursor;
+end auto_cursor;
+/
