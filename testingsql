@@ -1,0 +1,22 @@
+-- Display section structure
+
+select partition_name,
+       high_value,
+       num_rows,
+       blocks,
+       last_analyzed
+from user_tab_partitions
+where table_name = 'SYSTEM_LOGS'
+order by partition_name;
+
+-- Display detailed info about subpartitions
+
+select partition_name,
+       subpartition_name,
+       high_value,
+       num_rows,
+       blocks,
+       last_analyzed
+from user_tab_subpartitions
+where table_name = 'SYSTEM_LOGS'
+order by partition_name, subpartition_name;
