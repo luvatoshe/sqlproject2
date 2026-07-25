@@ -1,0 +1,81 @@
+-- Procedure of test data generation
+
+set serveroutput on;
+
+create or replace procedure generate_test_data (
+    p_count number default 1000000
+)
+is
+    v_types   SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST('INFO', 'WARNING', 'ERROR', 'CRITICAL');
+    v_modules SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST('AUTH', 'PAYMENT', 'ORDER', 'INVENTORY', 'USER');
+    v_start_date    date := to_date('2024-01-01', 'YYYY-MM-DD');
+    v_end_date      date := sysdate;
+    v_batch_size    number := 10000;
+    v_batches       number;
+    v_random_date   date;
+    v_random_module varchar2(64);
+    v_random_type   varchar2(20);
+    v_random_user   number;
+    v_random_ip     varchar2(45);
+    v_message       clob;
+    v_percentage    number;
+begin
+
+    -- Devide amount of test data by 10000 to avoid troubles and loads with large number of data
+    
+    v_batches := ceil(p_count / v_batch_size); 
+    
+    -- Generate random data
+    for batch in 1..v_batches loop
+        for i in 1..least(v_batch_size, p_count - (batch-1)*v_batch_size) loop
+            v_random_date :=  v_start_date + dbms_random.value(0, (v_end_date - v_start_date) * 24 * 60 * 60) / (24*60*60);
+            v_random_module := v_modules(trunc(dbms_random.value(1, v_modules.count + 1)));
+            v_random_type   := v_types(trunc(dbms_random.value(1, v_types.count + 1)));
+            v_random_user   := trunc(dbms_random.value(1, 10000));
+            v_random_ip     := trunc(dbms_random.value(1, 255)) || '.' ||
+                               trunc(dbms_random.value(1, 255)) || '.' ||
+                               trunc(dbms_random.value(1, 255)) || '.' ||
+                               trunc(dbms_random.value(1, 255));
+            v_message       := 'Log entry#' ||to_char(sysdate, 'YYYYMMDDHH24MISS') ||
+                               ' from module ' || v_random_module ||
+                               ' for user ' || v_random_user ||
+                               ' at ' || to_char(v_random_date, 'YYYYMMDDHH24MISS') || '.' ||
+                               ' Event type : ' || v_random_type || '.' ||
+                               ' This is a test log message.' ||
+                               rpad('X', trunc(dbms_random.value(100, 500)), 'X');
+            
+            -- Insert random data
+            
+            insert into system_logs (
+                log_id,
+                event_time,
+                module_name,
+                user_id, 
+                event_type,
+                message,
+                ip_adress
+            ) values (
+                      system_logs_seq.nextval,
+                      v_random_date,
+                      v_random_module,
+                      v_random_user,
+                      v_random_type,
+                      v_message,
+                      v_random_ip
+            );
+        end loop;
+        commit;
+        v_percentage := (batch * v_batch_size) / p_count * 100;
+        dbms_output.put_line('Downloaded ' || v_percentage || '% records...');
+    end loop;
+    dbms_output.put_line('Generation completed! Total inserted ' || p_count || ' records.');
+exception
+    when others then
+        rollback;
+        dbms_output.put_line('Error arises while generating data :' || sqlerrm);
+        raise;
+end generate_test_data;
+/
+
+exec generate_test_data(1000000);
+/
